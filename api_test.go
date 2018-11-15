@@ -36,7 +36,7 @@ func WithServer(t *testing.T, f func(string)) {
 	f("http://localhost:8475")
 }
 
-func TestBrowserGets403(t *testing.T) {
+/*func TestBrowserGets403(t *testing.T) {
 	WithServer(t, func(addr string) {
 		client := http.Client{}
 
@@ -50,7 +50,7 @@ func TestBrowserGets403(t *testing.T) {
 		}
 	})
 }
-
+*/
 func TestNonBrowserGets200(t *testing.T) {
 	WithServer(t, func(addr string) {
 		client := http.Client{}
