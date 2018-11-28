@@ -79,7 +79,7 @@ func (server *ApiServer) Listen(host string, port string) {
 		"host":    host,
 		"port":    port,
 		"version": Version,
-	}).Info("API HTTP server starting - Buckle")
+	}).Info("API HTTP server starting")
 
 	err := http.ListenAndServe(net.JoinHostPort(host, port), nil)
 	if err != nil {
