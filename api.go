@@ -45,15 +45,10 @@ func (server *ApiServer) PopulateConfig(filename string) {
 	}
 }
 
-func StopBrowsersMiddleware(h http.Handler) http.Handler {
+func allRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// We're ok with browsers hitting the proxy. I know of the report
-		// https://hackerone.com/reports/236349
-		/*if strings.HasPrefix(r.UserAgent(), "Mozilla/") {
-			http.Error(w, "User agent not allowed", 403)
-		} else {*/
-			h.ServeHTTP(w, r)
-		//}
+		setGlobalHeaders(w)
+		h.ServeHTTP(w, r)
 	})
 }
 
@@ -62,29 +57,42 @@ func (server *ApiServer) Listen(host string, port string) {
 	r.HandleFunc("/reset", server.ResetState).Methods("POST")
 	r.HandleFunc("/proxies", server.ProxyIndex).Methods("GET")
 	r.HandleFunc("/proxies", server.ProxyCreate).Methods("POST")
+	r.HandleFunc("/proxies", server.OptionsHandler).Methods("OPTIONS")
 	r.HandleFunc("/populate", server.Populate).Methods("POST")
 	r.HandleFunc("/proxies/{proxy}", server.ProxyShow).Methods("GET")
 	r.HandleFunc("/proxies/{proxy}", server.ProxyUpdate).Methods("POST")
 	r.HandleFunc("/proxies/{proxy}", server.ProxyDelete).Methods("DELETE")
+	r.HandleFunc("/proxies/{proxy}", server.OptionsHandler).Methods("OPTIONS")
 	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicIndex).Methods("GET")
 	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicCreate).Methods("POST")
+	r.HandleFunc("/proxies/{proxy}/toxics", server.OptionsHandler).Methods("OPTIONS")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicShow).Methods("GET")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicUpdate).Methods("POST")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicDelete).Methods("DELETE")
+	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.OptionsHandler).Methods("OPTIONS")
 
 	r.HandleFunc("/version", server.Version).Methods("GET")
 
-	http.Handle("/", StopBrowsersMiddleware(r))
+	http.Handle("/", allRequests(r))
 
 	logrus.WithFields(logrus.Fields{
 		"host":    host,
 		"port":    port,
 		"version": Version,
-	}).Info("API HTTP server starting")
+	}).Info("API HTTP server starting - Buckle")
 
 	err := http.ListenAndServe(net.JoinHostPort(host, port), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func (server *ApiServer) OptionsHandler(response http.ResponseWriter, request *http.Request) {
+	response.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+	response.Header().Set("Access-Control-Allow-Headers", request.Header.Get("Access-Control-Request-Headers"))
+	_, err := response.Write(nil)
+	if err != nil {
+		logrus.Warn("OptionsHandler: Failed to write response to client", err)
 	}
 }
 
@@ -102,7 +110,6 @@ func (server *ApiServer) ProxyIndex(response http.ResponseWriter, request *http.
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ProxyIndex: Failed to write response to client", err)
@@ -122,7 +129,6 @@ func (server *ApiServer) ResetState(response http.ResponseWriter, request *http.
 	}
 
 	response.WriteHeader(http.StatusNoContent)
-	setGlobalHeaders(response)
 	_, err := response.Write(nil)
 	if err != nil {
 		logrus.Warn("ResetState: Failed to write headers to client", err)
@@ -163,7 +169,6 @@ func (server *ApiServer) ProxyCreate(response http.ResponseWriter, request *http
 
 	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(http.StatusCreated)
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ProxyCreate: Failed to write response to client", err)
@@ -194,7 +199,6 @@ func (server *ApiServer) Populate(response http.ResponseWriter, request *http.Re
 
 	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(responseCode)
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("Populate: Failed to write response to client", err)
@@ -215,7 +219,6 @@ func (server *ApiServer) ProxyShow(response http.ResponseWriter, request *http.R
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ProxyShow: Failed to write response to client", err)
@@ -248,7 +251,6 @@ func (server *ApiServer) ProxyUpdate(response http.ResponseWriter, request *http
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ProxyUpdate: Failed to write response to client", err)
@@ -264,7 +266,6 @@ func (server *ApiServer) ProxyDelete(response http.ResponseWriter, request *http
 	}
 
 	response.WriteHeader(http.StatusNoContent)
-	setGlobalHeaders(response)
 	_, err = response.Write(nil)
 	if err != nil {
 		logrus.Warn("ProxyDelete: Failed to write headers to client", err)
@@ -286,7 +287,6 @@ func (server *ApiServer) ToxicIndex(response http.ResponseWriter, request *http.
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ToxicIndex: Failed to write response to client", err)
@@ -312,7 +312,6 @@ func (server *ApiServer) ToxicCreate(response http.ResponseWriter, request *http
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ToxicCreate: Failed to write response to client", err)
@@ -339,7 +338,6 @@ func (server *ApiServer) ToxicShow(response http.ResponseWriter, request *http.R
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ToxicShow: Failed to write response to client", err)
@@ -365,7 +363,6 @@ func (server *ApiServer) ToxicUpdate(response http.ResponseWriter, request *http
 	}
 
 	response.Header().Set("Content-Type", "application/json")
-	setGlobalHeaders(response)
 	_, err = response.Write(data)
 	if err != nil {
 		logrus.Warn("ToxicUpdate: Failed to write response to client", err)
@@ -386,7 +383,6 @@ func (server *ApiServer) ToxicDelete(response http.ResponseWriter, request *http
 	}
 
 	response.WriteHeader(http.StatusNoContent)
-	setGlobalHeaders(response)
 	_, err = response.Write(nil)
 	if err != nil {
 		logrus.Warn("ToxicDelete: Failed to write headers to client", err)
@@ -395,7 +391,6 @@ func (server *ApiServer) ToxicDelete(response http.ResponseWriter, request *http
 
 func (server *ApiServer) Version(response http.ResponseWriter, request *http.Request) {
 	response.Header().Set("Content-Type", "text/plain;charset=utf-8")
-	setGlobalHeaders(response)
 	_, err := response.Write([]byte(Version))
 	if err != nil {
 		logrus.Warn("Version: Failed to write response to client", err)
